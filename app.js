@@ -45,10 +45,11 @@ const GROUP_OPTIONS = [
     'خواردنەوەکان'
 ];
 
+// ✅ گۆڕدرا: لینکی TALABAT و WADE نوێ کرایەوە
 const PARTNER_LOGOS = {
-    talabat: 'https://i.ibb.co/MkN7kVY2/Tlogo-500.webp',
+    talabat: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTGRS3jOlaVmLGzt8mBEaq37ajNGfES2-0S-eR6fzyJv1wIndRH19hr0mw&s=10',
     zuu: 'https://i.ibb.co/gMT6mBmc/unnamed.webp',
-    wade: 'https://i.ibb.co/gL5L9vT9H/unnamed.png',
+    wade: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcThwXU5cNfgqX_tOlQCpJ0pit5I6TO73i4faRGoNS-56im3-IwhdfmL9hU&s=10',
     leezu: 'https://www.lezzoo.com/icon.png'
 };
 
@@ -112,7 +113,7 @@ function isResetWindow() {
 }
 
 // ============================================================
-// AUTO MONTH SYSTEM - automatically calculates days per month
+// AUTO MONTH SYSTEM
 // ============================================================
 
 function getDaysInMonth(date) {
@@ -1077,7 +1078,7 @@ function renderCashier() {
 }
 
 // ============================================================
-// MONTHLY TREND PAGE (auto day cards)
+// MONTHLY TREND PAGE
 // ============================================================
 function renderMonthlyTrendPage() {
     const monthDays = getMonthDays();
