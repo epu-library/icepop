@@ -170,14 +170,14 @@ function buildReceiptHTML(order) {
     const restPhone = '0750 826 03 08';
     const restAddress = 'شەقامی زانکۆ، هەولێر';
     const logo = 'https://i.ibb.co/5g9D2kBt/file-0000000075187246ad73011f5eda1ff3.png';
-
+    
     const orderTypeLabel = order.orderType === 'dine' ? 'ساڵە' : 'سەفەری';
     const receiptNo = 'ZN' + String(Date.now()).slice(-6);
-
+    
     const dateObj = new Date(order.timestamp);
     const dateStr = dateObj.toLocaleDateString('ku');
     const timeStr = order.time || dateObj.toLocaleTimeString('ku', { hour: '2-digit', minute: '2-digit' });
-
+    
     const itemsHtml = order.items.map(item => `
         <tr>
             <td class="item-name">${item.name}</td>
@@ -185,14 +185,14 @@ function buildReceiptHTML(order) {
             <td class="item-price">${formatPrice(item.price * item.qty)}</td>
         </tr>
     `).join('');
-
+    
     const discountHtml = order.discount > 0 ? `
         <div class="row discount-row">
             <span>داشکان (${order.discount}%)</span>
             <span>- ${formatPrice(order.discountAmount)}</span>
         </div>
     ` : '';
-
+    
     const paymentMethod = order.partner ? `شەریکە (${order.partner.toUpperCase()})` : 'نەقد';
 
     return `
@@ -206,7 +206,7 @@ function buildReceiptHTML(order) {
                     <div class="address-line">📍 ${restAddress}</div>
                 </div>
             </div>
-
+            
             <div class="row">
                 <span class="label">Receipt No:</span>
                 <span class="value">#${receiptNo}</span>
@@ -227,9 +227,9 @@ function buildReceiptHTML(order) {
                 <span class="label">جۆری ئۆردەر:</span>
                 <span class="value">${orderTypeLabel}</span>
             </div>
-
+            
             <div class="divider"></div>
-
+            
             <table class="items-table">
                 <thead>
                     <tr>
@@ -242,20 +242,20 @@ function buildReceiptHTML(order) {
                     ${itemsHtml}
                 </tbody>
             </table>
-
+            
             <div class="divider"></div>
-
+            
             ${discountHtml}
-
+            
             <div class="row total-row">
                 <span>کۆی گشتی</span>
                 <span class="total-amount">${formatPrice(order.total)}</span>
             </div>
-
+            
             <div class="payment-method">
                 💳 شێوەی پارەدان: ${paymentMethod}
             </div>
-
+            
             <div class="footer">
                 <div class="thanks">❤️ Thank You For Visiting Us ❤️</div>
                 <div style="font-size:13px;color:#64748b;margin-top:3px;">${restName} - ${branchName}</div>
