@@ -170,14 +170,14 @@ function buildReceiptHTML(order) {
     const restPhone = '0750 826 03 08';
     const restAddress = 'شەقامی زانکۆ، هەولێر';
     const logo = 'https://i.ibb.co/5g9D2kBt/file-0000000075187246ad73011f5eda1ff3.png';
-    
+
     const orderTypeLabel = order.orderType === 'dine' ? 'ساڵە' : 'سەفەری';
     const receiptNo = 'ZN' + String(Date.now()).slice(-6);
-    
+
     const dateObj = new Date(order.timestamp);
     const dateStr = dateObj.toLocaleDateString('ku');
     const timeStr = order.time || dateObj.toLocaleTimeString('ku', { hour: '2-digit', minute: '2-digit' });
-    
+
     const itemsHtml = order.items.map(item => `
         <tr>
             <td class="item-name">${item.name}</td>
@@ -185,14 +185,14 @@ function buildReceiptHTML(order) {
             <td class="item-price">${formatPrice(item.price * item.qty)}</td>
         </tr>
     `).join('');
-    
+
     const discountHtml = order.discount > 0 ? `
         <div class="row discount-row">
             <span>داشکان (${order.discount}%)</span>
             <span>- ${formatPrice(order.discountAmount)}</span>
         </div>
     ` : '';
-    
+
     const paymentMethod = order.partner ? `شەریکە (${order.partner.toUpperCase()})` : 'نەقد';
 
     return `
@@ -206,7 +206,7 @@ function buildReceiptHTML(order) {
                     <div class="address-line">📍 ${restAddress}</div>
                 </div>
             </div>
-            
+
             <div class="row">
                 <span class="label">Receipt No:</span>
                 <span class="value">#${receiptNo}</span>
@@ -227,9 +227,9 @@ function buildReceiptHTML(order) {
                 <span class="label">جۆری ئۆردەر:</span>
                 <span class="value">${orderTypeLabel}</span>
             </div>
-            
+
             <div class="divider"></div>
-            
+
             <table class="items-table">
                 <thead>
                     <tr>
@@ -242,23 +242,23 @@ function buildReceiptHTML(order) {
                     ${itemsHtml}
                 </tbody>
             </table>
-            
+
             <div class="divider"></div>
-            
+
             ${discountHtml}
-            
+
             <div class="row total-row">
                 <span>کۆی گشتی</span>
                 <span class="total-amount">${formatPrice(order.total)}</span>
             </div>
-            
+
             <div class="payment-method">
                 💳 شێوەی پارەدان: ${paymentMethod}
             </div>
-            
+
             <div class="footer">
                 <div class="thanks">❤️ Thank You For Visiting Us ❤️</div>
-                <div style="font-size:13px;color:#64748b;margin-top:3px;">${restName} - ${branchName}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:2px;">${restName} - ${branchName}</div>
             </div>
         </div>
     `;
@@ -616,17 +616,47 @@ function attachEvents() {
                 const printContainer = document.getElementById('print-receipt-container');
                 if (printContainer) {
                     printContainer.innerHTML = buildReceiptHTML(receiptOrder);
-                    setTimeout(() => {
+                    
+                    const images = printContainer.querySelectorAll('img');
+                    let loadedCount = 0;
+                    const totalImages = images.length;
+                    
+                    const triggerPrint = () => {
                         window.print();
                         setTimeout(() => { printContainer.innerHTML = ''; }, 1000);
-                    }, 200);
+                    };
+
+                    if (totalImages === 0) {
+                        setTimeout(triggerPrint, 300);
+                    } else {
+                        images.forEach(img => {
+                            if (img.complete) {
+                                loadedCount++;
+                            } else {
+                                img.onload = img.onerror = () => {
+                                    loadedCount++;
+                                };
+                            }
+                        });
+                        
+                        const checkImages = setInterval(() => {
+                            if (loadedCount >= totalImages) {
+                                clearInterval(checkImages);
+                                setTimeout(triggerPrint, 300);
+                            }
+                        }, 100);
+                        
+                        setTimeout(() => {
+                            clearInterval(checkImages);
+                            triggerPrint();
+                        }, 3000);
+                    }
                 }
             }
             render();
         };
     });
 
-    // Partner code numpad
     document.querySelectorAll('[data-numpad]').forEach(el => {
         el.onclick = () => {
             const v = el.dataset.numpad;
