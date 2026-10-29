@@ -110,13 +110,23 @@ body { background:#f0f2f5; min-height:100vh; padding:12px; display:flex; justify
 ::-webkit-scrollbar-thumb { background:#c4b5fd; border-radius:8px; }
 
 /* ============ RECEIPT PRINT STYLES ============ */
+
 #print-receipt-container { display: none; }
 
 .receipt-content { 
-    background: white; padding: 4px 6px !important; margin: 0 auto !important; 
-    font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.35; 
-    color: #1a1a2e; direction: rtl; width: 100%; max-width: 72mm; box-sizing: border-box;
+    background: white; 
+    padding: 4px 6px !important; 
+    margin: 0 auto !important; 
+    font-family: 'Courier New', monospace; 
+    font-size: 12px; 
+    line-height: 1.35; 
+    color: #1a1a2e; 
+    direction: rtl; 
+    width: 100%;
+    max-width: 64mm;
+    box-sizing: border-box;
 }
+
 .receipt-content .header { text-align:center; border-bottom:1.5px solid #000; padding-bottom:4px; margin-bottom:4px; }
 .receipt-content .header .rest-name { font-size:17px; font-weight:800; color:#1a1a2e; }
 .receipt-content .header .branch-name { font-size:14px; font-weight:700; color:#1a1a2e; margin:2px 0; }
@@ -153,15 +163,71 @@ body { background:#f0f2f5; min-height:100vh; padding:12px; display:flex; justify
 .receipt-content.zanco-receipt .payment-method { border-color:#e17055 !important; }
 
 /* ============ PRINT MEDIA QUERY ============ */
-@page { margin: 0; size: 80mm auto; }
+@page { 
+    margin: 0; 
+    size: 80mm auto; 
+}
 
 @media print {
-    html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; width: 80mm !important; height: auto !important; overflow: hidden !important; }
-    body * { visibility: hidden; }
-    #print-receipt-container, #print-receipt-container * { visibility: visible; }
-    #print-receipt-container { display: block !important; position: absolute; top: 0; right: 0; left: 0; width: 80mm !important; max-width: 80mm !important; padding: 0 !important; margin: 0 !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; overflow: hidden !important; box-sizing: border-box !important; }
-    .receipt-content, .receipt-content * { visibility: visible; }
-    .receipt-content { position: static !important; width: 72mm !important; max-width: 72mm !important; padding: 4px 2px !important; margin: 0 auto !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; font-family: 'Courier New', 'Lucida Console', monospace !important; font-size: 12px !important; line-height: 1.35 !important; color: #000 !important; print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; color-adjust: exact !important; direction: rtl !important; box-sizing: border-box !important; }
+    html, body { 
+        margin: 0 !important; 
+        padding: 0 !important; 
+        background: #fff !important; 
+        width: 80mm !important;
+        height: auto !important;
+        overflow: hidden !important;
+    }
+    
+    body * { 
+        visibility: hidden; 
+    }
+    
+    #print-receipt-container, #print-receipt-container * { 
+        visibility: visible; 
+    }
+    
+    #print-receipt-container { 
+        display: block !important; 
+        position: absolute; 
+        top: 0; 
+        right: 0;
+        left: 0;
+        width: 80mm !important;
+        max-width: 80mm !important; 
+        padding: 0 !important; 
+        margin: 0 !important; 
+        border: none !important; 
+        border-radius: 0 !important; 
+        box-shadow: none !important; 
+        background: #fff !important; 
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+    }
+    
+    .receipt-content, .receipt-content * { 
+        visibility: visible; 
+    }
+    
+    .receipt-content { 
+        position: static !important; 
+        width: 64mm !important;
+        max-width: 64mm !important; 
+        padding: 4px 2px !important; 
+        margin: 0 auto !important; 
+        border: none !important; 
+        border-radius: 0 !important; 
+        box-shadow: none !important; 
+        background: #fff !important; 
+        font-family: 'Courier New', 'Lucida Console', monospace !important; 
+        font-size: 12px !important; 
+        line-height: 1.35 !important; 
+        color: #000 !important; 
+        print-color-adjust: exact !important; 
+        -webkit-print-color-adjust: exact !important; 
+        color-adjust: exact !important; 
+        direction: rtl !important;
+        box-sizing: border-box !important;
+    }
     
     .receipt-content .header { text-align:center; border-bottom:1.5px solid #000 !important; padding-bottom:4px; margin-bottom:4px; }
     .receipt-content .header .rest-name { font-size:17px !important; font-weight:800 !important; color:#000 !important; letter-spacing:0.5px; }
