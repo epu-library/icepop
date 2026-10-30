@@ -34,33 +34,35 @@ const PARTNER_LOGOS = {
 // ============ UTILS ============
 function getBusinessDayStart(ts) {
     const d = new Date(ts);
-    if (d.getHours() < 2 || (d.getHours()===2 && d.getMinutes()<30)) {
-        const p = new Date(d); p.setDate(p.getDate()-1);
-        return new Date(p.getFullYear(), p.getMonth(), p.getDate(), 0,0,0,0);
+    if (d.getHours() < 2 || (d.getHours() === 2 && d.getMinutes() < 30)) {
+        const p = new Date(d); p.setDate(p.getDate() - 1);
+        return new Date(p.getFullYear(), p.getMonth(), p.getDate(), 0, 0, 0, 0);
     }
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0,0,0,0);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
 }
-function isSameBusinessDay(a,b) { return getBusinessDayStart(a).getTime() === getBusinessDayStart(b).getTime(); }
+function isSameBusinessDay(a, b) {
+    return getBusinessDayStart(a).getTime() === getBusinessDayStart(b).getTime();
+}
 
 function formatPrice(p) {
     if (!p && p !== 0) return '0 د.ع';
     return Math.round(p).toLocaleString('en-US') + ' د.ع';
 }
 function now() {
-    return new Date().toLocaleString('ku', { hour:'2-digit', minute:'2-digit', hour12:true });
+    return new Date().toLocaleString('ku', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 function getShift() {
     const h = new Date().getHours();
-    return (h>=9 && h<17.5) ? 'morning' : 'night';
+    return (h >= 9 && h < 17.5) ? 'morning' : 'night';
 }
-function genId() { return 'id_'+Date.now()+'_'+Math.random().toString(36).substr(2,4); }
-function generateUniqueOrderId() { return 'ord_'+Date.now()+'_'+Math.random().toString(36).substr(2,6); }
-function toast(msg, isErr=false) {
+function genId() { return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4); }
+function generateUniqueOrderId() { return 'ord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6); }
+function toast(msg, isErr = false) {
     const t = document.createElement('div');
-    t.className = 'toast' + (isErr?' error':'');
+    t.className = 'toast' + (isErr ? ' error' : '');
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(()=>t.remove(), 3000);
+    setTimeout(() => t.remove(), 3000);
 }
 function getPrice(item, partner) {
     if (partner && item.partnerPrices && item.partnerPrices[partner] != null) return item.partnerPrices[partner];
@@ -88,12 +90,15 @@ const state = {
     unsubscribeItems: null,
     unsubscribeOrders: null,
     unsubscribePartnerOrders: null,
-    partnerImages: { talabat:'', zuu:'', wade:'', leezu:'' },
+    partnerImages: { talabat: '', zuu: '', wade: '', leezu: '' },
     showPartnerCodeModal: false,
     pendingPartner: null,
     itemsPanelScrollTop: 0,
     showReceipt: false,
-    receiptOrder: null
+    receiptOrder: null,
+    showTableModal: false,
+    activeTable: null,
+    tableOrders: {}
 };
 
 // ============ FIRESTORE ============
@@ -154,13 +159,13 @@ async function saveOrdersToFirestore() {
     try {
         const ordersToSave = state.orders.map(o => ({ ...o, itemStatuses: o.itemStatuses || {} }));
         await updateDoc(docRef, { orders: ordersToSave, lastUpdated: new Date().toISOString() });
-    } catch(e) { toast('هەڵە لە سەیڤکردن', true); }
+    } catch (e) { toast('هەڵە لە سەیڤکردن', true); }
 }
 
 async function savePartnerOrderToFirestore(order) {
     try {
         await addDoc(collection(db, PARTNER_ORDERS_COLLECTION), order);
-    } catch(e) { toast('هەڵە لە سەیڤکردنی ئۆردەری شەریکە', true); }
+    } catch (e) { toast('هەڵە لە سەیڤکردنی ئۆردەری شەریکە', true); }
 }
 
 // ============ RECEIPT HTML BUILDER ============
@@ -194,6 +199,12 @@ function buildReceiptHTML(order) {
     ` : '';
 
     const paymentMethod = order.partner ? `شەریکە (${order.partner.toUpperCase()})` : 'نەقد';
+    const tableHtml = order.tableNumber ? `
+        <div class="row">
+            <span class="label">مێز:</span>
+            <span class="value">${order.tableNumber}</span>
+        </div>
+    ` : '';
 
     return `
         <div class="receipt-content zanco-receipt">
@@ -227,6 +238,7 @@ function buildReceiptHTML(order) {
                 <span class="label">جۆری ئۆردەر:</span>
                 <span class="value">${orderTypeLabel}</span>
             </div>
+            ${tableHtml}
 
             <div class="divider"></div>
 
@@ -283,6 +295,7 @@ function render() {
     else if (state.currentPage === 'cashier') html = renderCashier();
 
     if (state.showPartnerCodeModal && state.pendingPartner) html += renderPartnerCodeModal();
+    if (state.showTableModal) html += renderTableModal();
 
     app.innerHTML = html;
 
@@ -322,16 +335,16 @@ function renderCashier() {
             <div class="item-card" data-id="${item.id}">
                 <div class="item-image-wrapper">
                     ${item.image ? `<img src="${item.image}" alt="${item.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"/>` : ''}
-                    <span class="emoji-placeholder" style="${item.image?'display:none;':''}">🍽️</span>
+                    <span class="emoji-placeholder" style="${item.image ? 'display:none;' : ''}">🍽️</span>
                 </div>
                 <div class="name">${item.name}</div>
                 <div class="price">${formatPrice(displayPrice)}</div>
-                ${item.branch?`<div class="item-branch-info">📌 ${item.branch}</div>`:''}
+                ${item.branch ? `<div class="item-branch-info">📌 ${item.branch}</div>` : ''}
             </div>`;
     }).join('');
 
     const groupButtons = ['هەموو', ...GROUP_OPTIONS].map(g =>
-        `<button class="${state.selectedGroup===g?'active':''}" data-action="filter-group" data-group="${g}">${g}</button>`
+        `<button class="${state.selectedGroup === g ? 'active' : ''}" data-action="filter-group" data-group="${g}">${g}</button>`
     ).join('');
 
     const cartHtml = state.cart.map((item, idx) => `
@@ -346,9 +359,9 @@ function renderCashier() {
             </div>
         </div>`).join('');
 
-    const originalTotal = state.cart.reduce((s,i)=>s+i.price*i.qty, 0);
-    const discountedTotal = state.discount > 0 ? originalTotal - (originalTotal*state.discount)/100 : originalTotal;
-    const discountAmount = state.discount > 0 ? (originalTotal*state.discount)/100 : 0;
+    const originalTotal = state.cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const discountedTotal = state.discount > 0 ? originalTotal - (originalTotal * state.discount) / 100 : originalTotal;
+    const discountAmount = state.discount > 0 ? (originalTotal * state.discount) / 100 : 0;
 
     let totalDisplay = '';
     if (state.discount > 0 && state.orderType !== 'partner') {
@@ -362,22 +375,22 @@ function renderCashier() {
         totalDisplay = `<div style="display:flex;justify-content:space-between;width:100%;"><span>کۆی گشتی:</span><span>${formatPrice(originalTotal)}</span></div>`;
     }
 
-    const deliveryBtns = ['dine','takeaway','partner'].map(t => {
-        const labels = { dine:'🍽️ ساڵە', takeaway:'🛍️ سەفەری', partner:'🤝 شەریکە' };
-        return `<button class="${state.orderType===t?'active':''}" data-action="set-type" data-type="${t}">${labels[t]}</button>`;
+    const deliveryBtns = ['dine', 'takeaway', 'partner'].map(t => {
+        const labels = { dine: '🍽️ ساڵە', takeaway: '🛍️ سەفەری', partner: '🤝 شەریکە' };
+        return `<button class="${state.orderType === t ? 'active' : ''}" data-action="set-type" data-type="${t}">${labels[t]}</button>`;
     }).join('');
 
-    const partnerBtns = ['talabat','zuu','wade','leezu'].map(p => {
+    const partnerBtns = ['talabat', 'zuu', 'wade', 'leezu'].map(p => {
         const img = state.partnerImages[p] || PARTNER_LOGOS[p] || '';
         const display = img ? `<img src="${img}" onerror="this.style.display='none';"/>` : '';
         const label = p.charAt(0).toUpperCase() + p.slice(1);
-        return `<button class="${state.partner===p?'active':''}" data-action="open-partner-code" data-partner="${p}">${display}<span class="partner-label">${label}</span></button>`;
+        return `<button class="${state.partner === p ? 'active' : ''}" data-action="open-partner-code" data-partner="${p}">${display}<span class="partner-label">${label}</span></button>`;
     }).join('');
 
     const partnerInfo = state.partner ? `
         <span class="partner-info-badge">
-            <img src="${PARTNER_LOGOS[state.partner]||''}" onerror="this.style.display='none';"/>
-            ${state.partner.toUpperCase()} ${state.partnerCode?'- '+state.partnerCode:''}
+            <img src="${PARTNER_LOGOS[state.partner] || ''}" onerror="this.style.display='none';"/>
+            ${state.partner.toUpperCase()} ${state.partnerCode ? '- ' + state.partnerCode : ''}
         </span>` : '';
 
     let discountButtons = '';
@@ -385,11 +398,23 @@ function renderCashier() {
         discountButtons = `
             <div class="discount-buttons">
                 <span class="label">🏷️ داشکان:</span>
-                <button class="btn-discount ${state.discount===30?'active':''}" data-action="set-discount" data-percent="30">%30</button>
-                <button class="btn-discount ${state.discount===50?'active':''}" data-action="set-discount" data-percent="50">%50</button>
-                ${state.discount>0?`<button class="btn-discount" data-action="set-discount" data-percent="0" style="background:#e2e8f0;color:#1a1a2e;box-shadow:none;">✕ لابردن</button>`:''}
+                <button class="btn-discount ${state.discount === 20 ? 'active' : ''}" data-action="set-discount" data-percent="20">%20</button>
+                <button class="btn-discount ${state.discount === 30 ? 'active' : ''}" data-action="set-discount" data-percent="30">%30</button>
+                <button class="btn-discount ${state.discount === 50 ? 'active' : ''}" data-action="set-discount" data-percent="50">%50</button>
+                ${state.discount > 0 ? `<button class="btn-discount" data-action="set-discount" data-percent="0" style="background:#e2e8f0;color:#1a1a2e;box-shadow:none;">✕ لابردن</button>` : ''}
             </div>`;
     }
+
+    let tableInfoHtml = '';
+    if (state.orderType === 'dine' && state.activeTable) {
+        tableInfoHtml = `
+            <div style="background:#dcfce7;border:2px solid #22c55e;border-radius:12px;padding:8px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:#166534;">
+                <span>🍽️ مێزی ژمارە ${state.activeTable}</span>
+                <button data-action="close-active-table" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;">✕ داخستن</button>
+            </div>`;
+    }
+
+    const saveBtnText = (state.orderType === 'dine' && state.activeTable) ? '💾 حساب' : '💾 سەیڤ کردن';
 
     return `
         <div>
@@ -409,13 +434,14 @@ function renderCashier() {
                 <div class="order-panel">
                     <h3>📋 ئۆردەر</h3>
                     <div class="delivery-options">${deliveryBtns}</div>
+                    ${tableInfoHtml}
                     <div class="cashier-partner-buttons">${partnerBtns}${partnerInfo}</div>
                     ${discountButtons}
                     <div class="order-list">${cartHtml || '<p style="color:#94a3b8;text-align:center;padding:20px;">تا ئێستا هیچ شتێک زیاد نەکراوە</p>'}</div>
                     <div class="order-total">${totalDisplay}</div>
                     <div class="order-actions">
                         <button class="btn btn-danger" data-action="clear-cart">🧹 خاڵی کردن</button>
-                        <button class="btn btn-success" data-action="save-order">💾 سەیڤ کردن</button>
+                        <button class="btn btn-success" data-action="save-order">${saveBtnText}</button>
                     </div>
                 </div>
             </div>
@@ -432,9 +458,9 @@ function renderPartnerCodeModal() {
 
     const numpad = `
         <div class="numpad-grid">
-            ${[1,2,3].map(n=>`<button data-numpad="${n}">${n}</button>`).join('')}
-            ${[4,5,6].map(n=>`<button data-numpad="${n}">${n}</button>`).join('')}
-            ${[7,8,9].map(n=>`<button data-numpad="${n}">${n}</button>`).join('')}
+            ${[1, 2, 3].map(n => `<button data-numpad="${n}">${n}</button>`).join('')}
+            ${[4, 5, 6].map(n => `<button data-numpad="${n}">${n}</button>`).join('')}
+            ${[7, 8, 9].map(n => `<button data-numpad="${n}">${n}</button>`).join('')}
             <button class="clear-btn" data-numpad="clear">✕</button>
             <button data-numpad="0">0</button>
             <button class="backspace-btn" data-numpad="backspace">⌫</button>
@@ -454,13 +480,35 @@ function renderPartnerCodeModal() {
         </div>`;
 }
 
+function renderTableModal() {
+    const tables = [];
+    for (let i = 1; i <= 10; i++) {
+        const isOccupied = !!state.tableOrders[i];
+        tables.push(`
+            <div class="table-btn ${isOccupied ? 'occupied' : ''}" data-table="${i}">
+                <div class="table-num">${i}</div>
+                <div class="table-label">${isOccupied ? 'گیراوە' : 'بەتاڵ'}</div>
+            </div>
+        `);
+    }
+    return `
+        <div class="modal-overlay" id="table-modal-overlay">
+            <div class="modal table-modal">
+                <button class="close-btn" id="close-table-modal">✕</button>
+                <h3>🍽️ مێزەکان</h3>
+                <p class="hint" style="color:#64748b;font-size:13px;margin-bottom:12px;">مێزێک هەڵبژێرە</p>
+                <div class="table-grid">${tables.join('')}</div>
+            </div>
+        </div>
+    `;
+}
 // ============ EVENTS ============
 function attachEvents() {
     document.querySelectorAll('[data-action="login-cashier"]').forEach(el => {
         el.onclick = () => {
             const u = document.getElementById('username')?.value.trim();
             const p = document.getElementById('password')?.value.trim();
-            if ((u==='fayaq'&&p==='f00') || (u==='blnd'&&p==='a00')) {
+            if ((u === 'fayaq' && p === 'f00') || (u === 'blnd' && p === 'a00')) {
                 state.currentUser = u;
                 state.currentRole = 'cashier';
                 state.currentPage = 'cashier';
@@ -482,6 +530,8 @@ function attachEvents() {
             state.discountAmount = 0;
             state.showPartnerCodeModal = false;
             state.pendingPartner = null;
+            state.showTableModal = false;
+            state.activeTable = null;
             render();
         };
     });
@@ -499,7 +549,7 @@ function attachEvents() {
             if (item) {
                 const existing = state.cart.find(i => i.id === id);
                 let priceToUse = item.price;
-                if (state.orderType==='partner' && state.partner && item.partnerPrices && item.partnerPrices[state.partner] != null) {
+                if (state.orderType === 'partner' && state.partner && item.partnerPrices && item.partnerPrices[state.partner] != null) {
                     priceToUse = item.partnerPrices[state.partner];
                 }
                 if (existing) { existing.qty++; existing.price = priceToUse; }
@@ -519,8 +569,8 @@ function attachEvents() {
             const idx = parseInt(el.dataset.idx);
             const dir = el.dataset.dir;
             if (state.cart[idx]) {
-                if (dir==='+') state.cart[idx].qty++;
-                else { state.cart[idx].qty--; if (state.cart[idx].qty<=0) state.cart.splice(idx,1); }
+                if (dir === '+') state.cart[idx].qty++;
+                else { state.cart[idx].qty--; if (state.cart[idx].qty <= 0) state.cart.splice(idx, 1); }
                 state.discount = 0; state.discountAmount = 0;
                 render();
             }
@@ -549,8 +599,8 @@ function attachEvents() {
                 if (state.discount === p) { state.discount = 0; state.discountAmount = 0; }
                 else {
                     state.discount = p;
-                    const orig = state.cart.reduce((s,i)=>s+i.price*i.qty, 0);
-                    state.discountAmount = (orig*p)/100;
+                    const orig = state.cart.reduce((s, i) => s + i.price * i.qty, 0);
+                    state.discountAmount = (orig * p) / 100;
                 }
             }
             render();
@@ -561,11 +611,28 @@ function attachEvents() {
         el.onclick = () => {
             const prev = state.orderType;
             const nw = el.dataset.type;
+
+            if (nw === 'dine') {
+                state.orderType = 'dine';
+                state.activeTable = null;
+                state.cart = [];
+                state.discount = 0; state.discountAmount = 0;
+                state.showTableModal = true;
+                render();
+                return;
+            }
+
+            if (prev === 'dine') {
+                state.activeTable = null;
+                state.cart = [];
+                state.discount = 0; state.discountAmount = 0;
+            }
+
             state.orderType = nw;
-            if (nw==='partner' && state.partner) updatePricesForPartner(state.partner);
-            else if (nw!=='partner' && prev==='partner') { resetPricesToDefault(); state.partner = null; state.partnerCode = ''; }
-            else if (nw!=='partner') resetPricesToDefault();
-            if (nw!=='partner') { state.discount = 0; state.discountAmount = 0; }
+            if (nw === 'partner' && state.partner) updatePricesForPartner(state.partner);
+            else if (nw !== 'partner' && prev === 'partner') { resetPricesToDefault(); state.partner = null; state.partnerCode = ''; }
+            else if (nw !== 'partner') resetPricesToDefault();
+            if (nw !== 'partner') { state.discount = 0; state.discountAmount = 0; }
             render();
         };
     });
@@ -577,82 +644,134 @@ function attachEvents() {
         };
     });
 
+    // ===== TABLE SELECTION =====
+    document.querySelectorAll('.table-btn').forEach(el => {
+        el.onclick = () => {
+            const n = parseInt(el.dataset.table);
+            const saved = state.tableOrders[n];
+
+            state.activeTable = n;
+            state.orderType = 'dine';
+
+            if (saved && saved.cart && saved.cart.length > 0) {
+                state.cart = saved.cart.map(i => ({ ...i }));
+                state.discount = saved.discount || 0;
+                state.discountAmount = saved.discountAmount || 0;
+                toast(`مێزی ${n} کرایەوە (گیراوە)`);
+            } else {
+                state.cart = [];
+                state.discount = 0; state.discountAmount = 0;
+                toast(`مێزی ${n} هەڵبژێردرا`);
+            }
+
+            state.showTableModal = false;
+            render();
+        };
+    });
+
+    const closeTable = document.getElementById('close-table-modal');
+    if (closeTable) closeTable.onclick = () => { state.showTableModal = false; render(); };
+    const tableOverlay = document.getElementById('table-modal-overlay');
+    if (tableOverlay) tableOverlay.onclick = (e) => { if (e.target === tableOverlay) { state.showTableModal = false; render(); } };
+
+    document.querySelectorAll('[data-action="close-active-table"]').forEach(el => {
+        el.onclick = () => {
+            if (state.activeTable) {
+                if (state.cart.length > 0) {
+                    state.tableOrders[state.activeTable] = {
+                        cart: state.cart.map(i => ({ ...i })),
+                        discount: state.discount,
+                        discountAmount: state.discountAmount
+                    };
+                }
+            }
+            state.activeTable = null;
+            state.cart = [];
+            state.discount = 0; state.discountAmount = 0;
+            render();
+        };
+    });
+
     document.querySelectorAll('[data-action="save-order"]').forEach(el => {
         el.onclick = async (e) => {
             e.preventDefault();
             if (!state.cart.length) { toast('تکایە لاپەڕەکە پڕ بکە', true); return; }
-            if (state.orderType==='partner' && !state.partner) { toast('تکایە شەریکە دیاری بکە', true); return; }
-            if (state.orderType==='partner' && !state.partnerCode) { toast('تکایە کۆدی شەریکە داخل بکە', true); return; }
+            if (state.orderType === 'partner' && !state.partner) { toast('تکایە شەریکە دیاری بکە', true); return; }
+            if (state.orderType === 'partner' && !state.partnerCode) { toast('تکایە کۆدی شەریکە داخل بکە', true); return; }
+            if (state.orderType === 'dine' && !state.activeTable) { toast('تکایە مێزێک هەڵبژێرە', true); return; }
 
+            const originalTotal = state.cart.reduce((s, i) => s + i.price * i.qty, 0);
+            const discountedTotal = state.discount > 0 ? originalTotal - (originalTotal * state.discount) / 100 : originalTotal;
+            const discountAmount = state.discount > 0 ? (originalTotal * state.discount) / 100 : 0;
+
+            const isDineTable = (state.orderType === 'dine' && state.activeTable);
+            const tableHadData = isDineTable && !!state.tableOrders[state.activeTable];
+
+            // ===== DINE-IN: FIRST SAVE (مێز دەگیرێت + پرێنت، تۆمار ناکرێت) =====
+            if (isDineTable && !tableHadData) {
+                state.tableOrders[state.activeTable] = {
+                    cart: state.cart.map(i => ({ ...i })),
+                    discount: state.discount,
+                    discountAmount: state.discountAmount
+                };
+
+                const tempOrder = {
+                    uniqueId: generateUniqueOrderId(),
+                    items: state.cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.price, group: i.group, image: i.image })),
+                    total: discountedTotal,
+                    originalTotal, discount: state.discount, discountAmount,
+                    orderType: 'dine', partner: null, partnerCode: '',
+                    time: now(), shift: getShift(), cashier: state.currentUser, branch: 'زانکۆ',
+                    timestamp: Date.now(), tableNumber: state.activeTable
+                };
+
+                printReceipt(tempOrder);
+                toast(`✅ مێزی ${state.activeTable} گیرا (تۆمار نەکرا)`);
+                state.activeTable = null;
+                state.cart = [];
+                state.discount = 0; state.discountAmount = 0;
+                render();
+                return;
+            }
+
+            // ===== NORMAL SAVE (سەفەری / جاری دووەمی حساب / شەریکە) =====
             const uniqueId = generateUniqueOrderId();
-            const originalTotal = state.cart.reduce((s,i)=>s+i.price*i.qty, 0);
-            const discountedTotal = state.discount>0 ? originalTotal-(originalTotal*state.discount)/100 : originalTotal;
-            const discountAmount = state.discount>0 ? (originalTotal*state.discount)/100 : 0;
 
             const orderData = {
-                items: state.cart.map(i => ({ id:i.id, name:i.name, qty:i.qty, price:i.price, group:i.group, image:i.image })),
+                items: state.cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.price, group: i.group, image: i.image })),
                 total: discountedTotal,
                 originalTotal, discount: state.discount, discountAmount,
                 orderType: state.orderType, partner: state.partner, partnerCode: state.partnerCode,
                 time: now(), shift: getShift(), cashier: state.currentUser, branch: 'زانکۆ',
-                timestamp: Date.now(), image: state.cart[0]?.image || ''
+                timestamp: Date.now(), image: state.cart[0]?.image || '',
+                tableNumber: isDineTable ? state.activeTable : null
             };
 
-            const order = { uniqueId, ...orderData, status:'completed', itemStatuses: {} };
+            const order = { uniqueId, ...orderData, status: 'completed', itemStatuses: {} };
             order.items.forEach(it => { order.itemStatuses[it.id] = 'ready'; });
 
             state.orders.push(order);
-            if (state.orderType==='partner' && state.partner) await savePartnerOrderToFirestore(orderData);
+            if (state.orderType === 'partner' && state.partner) {
+                savePartnerOrderToFirestore(orderData);
+            }
 
             const receiptOrder = { ...order };
+
+            if (isDineTable) {
+                delete state.tableOrders[state.activeTable];
+                state.activeTable = null;
+            }
+
             state.cart = [];
             state.partnerCode = '';
             state.discount = 0; state.discountAmount = 0;
             toast('✅ ئۆردەر سەیڤ کرا!');
-            await saveOrdersToFirestore();
 
-            const isDine = state.orderType==='dine' || state.orderType==='takeaway';
-            if (isDine) {
-                const printContainer = document.getElementById('print-receipt-container');
-                if (printContainer) {
-                    printContainer.innerHTML = buildReceiptHTML(receiptOrder);
-                    
-                    const images = printContainer.querySelectorAll('img');
-                    let loadedCount = 0;
-                    const totalImages = images.length;
-                    
-                    const triggerPrint = () => {
-                        window.print();
-                        setTimeout(() => { printContainer.innerHTML = ''; }, 1000);
-                    };
-
-                    if (totalImages === 0) {
-                        setTimeout(triggerPrint, 300);
-                    } else {
-                        images.forEach(img => {
-                            if (img.complete) {
-                                loadedCount++;
-                            } else {
-                                img.onload = img.onerror = () => {
-                                    loadedCount++;
-                                };
-                            }
-                        });
-                        
-                        const checkImages = setInterval(() => {
-                            if (loadedCount >= totalImages) {
-                                clearInterval(checkImages);
-                                setTimeout(triggerPrint, 300);
-                            }
-                        }, 100);
-                        
-                        setTimeout(() => {
-                            clearInterval(checkImages);
-                            triggerPrint();
-                        }, 3000);
-                    }
-                }
+            if (state.orderType === 'dine' || state.orderType === 'takeaway' || isDineTable) {
+                printReceipt(receiptOrder);
             }
+
+            saveOrdersToFirestore();
             render();
         };
     });
@@ -660,20 +779,37 @@ function attachEvents() {
     document.querySelectorAll('[data-numpad]').forEach(el => {
         el.onclick = () => {
             const v = el.dataset.numpad;
-            if (v==='clear') { state.partnerCode=''; }
-            else if (v==='backspace') { state.partnerCode = state.partnerCode.slice(0,-1); }
+            if (v === 'clear') { state.partnerCode = ''; }
+            else if (v === 'backspace') { state.partnerCode = state.partnerCode.slice(0, -1); }
             else if (state.partnerCode.length < 4) { state.partnerCode += v; }
             updatePartnerDisplay();
             const err = document.getElementById('partner-code-error');
             if (err) err.classList.remove('show');
-            if (state.partnerCode.length === 4) setTimeout(confirmPartnerCode, 350);
+            if (state.partnerCode.length === 4) {
+                const partnerToConfirm = state.pendingPartner;
+                setTimeout(() => confirmPartnerCode(partnerToConfirm), 350);
+            }
         };
     });
 
     const closeP = document.getElementById('close-partner-code-modal');
     if (closeP) closeP.onclick = closePartnerCodeModal;
     const pOverlay = document.getElementById('partner-code-modal-overlay');
-    if (pOverlay) pOverlay.onclick = (e) => { if (e.target===pOverlay) closePartnerCodeModal(); };
+    if (pOverlay) pOverlay.onclick = (e) => { if (e.target === pOverlay) closePartnerCodeModal(); };
+}
+
+// ============ PRINT HELPER ============
+function printReceipt(order) {
+    const printContainer = document.getElementById('print-receipt-container');
+    if (!printContainer) return;
+
+    printContainer.innerHTML = buildReceiptHTML(order);
+
+    window.print();
+
+    setTimeout(() => {
+        printContainer.innerHTML = '';
+    }, 500);
 }
 
 function updatePartnerDisplay() {
@@ -690,15 +826,18 @@ function openPartnerCodeModal(partner) {
     state.partnerCode = '';
     render();
 }
+
 function closePartnerCodeModal() {
     state.showPartnerCodeModal = false;
     state.pendingPartner = null;
     state.partnerCode = '';
     render();
 }
-function confirmPartnerCode() {
+
+function confirmPartnerCode(partner) {
+    if (!partner) return;
     if (state.partnerCode.length === 4 && /^\d{4}$/.test(state.partnerCode)) {
-        state.partner = state.pendingPartner;
+        state.partner = partner;
         state.orderType = 'partner';
         state.showPartnerCodeModal = false;
         state.pendingPartner = null;
@@ -707,6 +846,7 @@ function confirmPartnerCode() {
         render();
     }
 }
+
 function updatePricesForPartner(partner) {
     if (!partner || !state.cart.length) return;
     let changed = false;
@@ -721,11 +861,12 @@ function updatePricesForPartner(partner) {
     });
     if (changed) { toast(`🔄 نرخ گۆڕدرا بۆ ${partner.toUpperCase()}`); render(); }
 }
+
 function resetPricesToDefault() {
     if (!state.cart.length) return;
     let changed = false;
     state.cart = state.cart.map(item => {
-        const def = state.items.find(i=>i.id===item.id)?.price || item.price;
+        const def = state.items.find(i => i.id === item.id)?.price || item.price;
         if (item.price !== def) { changed = true; return { ...item, price: def }; }
         return item;
     });
@@ -737,11 +878,11 @@ async function init() {
     state.isLoading = true;
     render();
     try {
-        try { await signInAnonymously(auth); } catch(e) {}
+        try { await signInAnonymously(auth); } catch (e) {}
         loadItemsFromFirestore();
         loadOrdersFromFirestore();
         loadPartnerOrdersFromFirestore();
-    } catch(e) {
+    } catch (e) {
         state.firebaseError = e.message;
         state.isLoading = false;
         render();
