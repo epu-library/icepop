@@ -172,6 +172,86 @@ body { background:#f0f2f5; min-height:100vh; padding:12px; display:flex; justify
 .receipt-content.zanco-receipt .footer .thanks { color:#e17055 !important; }
 .receipt-content.zanco-receipt .payment-method { border-color:#e17055 !important; }
 
+/* ===== چاککردنی شاشەی بچووک (ئایپاد و مۆبایل) ===== */
+@media (max-width: 1024px) {
+    body { padding: 8px; }
+
+    .cashier-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: auto;
+        gap: 12px;
+    }
+
+    .items-panel {
+        height: auto;
+        max-height: 55vh;
+        overflow-y: auto;
+    }
+
+    .order-panel {
+        height: auto;
+        max-height: 78vh;
+        overflow-y: auto;
+        position: relative;
+        padding-bottom: 0;
+    }
+
+    .order-list {
+        flex: 0 1 auto;
+        max-height: 30vh;
+        min-height: 60px;
+    }
+
+    /* دوگمەکانی خوارەوە هەمیشە دیار بن */
+    .order-actions {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        padding: 8px 0 12px;
+        margin-top: 6px;
+        border-top: 1px solid #e2e8f0;
+        box-shadow: 0 -6px 16px rgba(0,0,0,.06);
+        z-index: 5;
+    }
+
+    .order-total {
+        position: sticky;
+        bottom: 56px;
+        background: #fff;
+        z-index: 4;
+        padding: 6px 0;
+    }
+
+    .delivery-options button,
+    .cashier-partner-buttons button {
+        min-width: 50px;
+        font-size: 12px;
+        padding: 8px 10px;
+    }
+
+    .item-grid {
+        grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .items-panel { max-height: 45vh; }
+    .order-panel { max-height: 80vh; }
+    .order-list { max-height: 26vh; }
+
+    .order-actions button {
+        font-size: 13px;
+        padding: 9px;
+    }
+
+    .btn-discount {
+        min-width: 52px;
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+}
+
 @page { 
     margin: 0; 
     size: 80mm auto; 
