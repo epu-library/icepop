@@ -125,14 +125,10 @@ function loadItemsFromFirestore() {
             state.isLoading = false;
             render();
         } else {
-            console.warn('⚠️ دۆکیومێنتی سەرەکی نییە — دروستی دەکەین');
-            setDoc(docRef, { items: [], orders: [], partnerImages: {} }, { merge: true })
-                .catch(err => console.error('❌ هەڵە لە دروستکردنی دۆکیومێنت:', err));
             state.isLoading = false;
             render();
         }
     }, (err) => {
-        console.error('❌ هەڵە لە خوێندنەوەی ئایتمەکان:', err);
         state.firebaseError = err.message;
         state.isLoading = false;
         render();
@@ -145,18 +141,8 @@ function loadOrdersFromFirestore() {
         if (snap.exists()) {
             const data = snap.data();
             state.orders = data.orders || [];
-            console.log('📥 ئۆردەرەکان لە Firestore هاتن:', state.orders.length);
-            render();
-        } else {
-            console.warn('⚠️ دۆکیومێنت نییە — ئۆردەرەکان بەتاڵن');
-            state.orders = [];
             render();
         }
-    }, (err) => {
-        console.error('❌ هەڵە لە خوێندنەوەی ئۆردەرەکان:', err);
-        state.firebaseError = err.message;
-        toast('هەڵە لە خوێندنەوەی ئۆردەرەکان: ' + err.message, true);
-        render();
     });
 }
 
@@ -166,35 +152,20 @@ function loadPartnerOrdersFromFirestore() {
         const arr = [];
         snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
         state.partnerOrders = arr;
-        console.log('📥 ئۆردەری شەریکە لە Firestore هاتن:', arr.length);
-    }, (err) => {
-        console.error('❌ هەڵە لە خوێندنەوەی ئۆردەری شەریکە:', err);
-        toast('هەڵە لە خوێندنەوەی ئۆردەری شەریکە: ' + err.message, true);
     });
 }
 
 async function saveOrdersToFirestore() {
     try {
         const ordersToSave = state.orders.map(o => ({ ...o, itemStatuses: o.itemStatuses || {} }));
-        await setDoc(docRef, {
-            orders: ordersToSave,
-            lastUpdated: new Date().toISOString()
-        }, { merge: true });
-        console.log('✅ ئۆردەر سەیڤ کرا بۆ Firestore — ژمارە:', ordersToSave.length);
-    } catch (e) {
-        console.error('❌ هەڵە لە سەیڤکردنی ئۆردەر:', e);
-        toast('هەڵە لە سەیڤکردن: ' + e.message, true);
-    }
+        await updateDoc(docRef, { orders: ordersToSave, lastUpdated: new Date().toISOString() });
+    } catch (e) { toast('هەڵە لە سەیڤکردن', true); }
 }
 
 async function savePartnerOrderToFirestore(order) {
     try {
         await addDoc(collection(db, PARTNER_ORDERS_COLLECTION), order);
-        console.log('✅ ئۆردەری شەریکە سەیڤ کرا:', order.uniqueId);
-    } catch (e) {
-        console.error('❌ هەڵە لە سەیڤکردنی ئۆردەری شەریکە:', e);
-        toast('هەڵە لە سەیڤکردنی ئۆردەری شەریکە: ' + e.message, true);
-    }
+    } catch (e) { toast('هەڵە لە سەیڤکردنی ئۆردەری شەریکە', true); }
 }
 
 // ============ RECEIPT HTML BUILDER ============
@@ -531,7 +502,6 @@ function renderTableModal() {
         </div>
     `;
 }
-
 // ============ EVENTS ============
 function attachEvents() {
     document.querySelectorAll('[data-action="login-cashier"]').forEach(el => {
@@ -722,7 +692,6 @@ function attachEvents() {
         };
     });
 
-    // ===== SAVE ORDER =====
     document.querySelectorAll('[data-action="save-order"]').forEach(el => {
         el.onclick = async (e) => {
             e.preventDefault();
@@ -769,45 +738,40 @@ function attachEvents() {
             const uniqueId = generateUniqueOrderId();
 
             const orderData = {
-                uniqueId,
                 items: state.cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.price, group: i.group, image: i.image })),
                 total: discountedTotal,
                 originalTotal, discount: state.discount, discountAmount,
                 orderType: state.orderType, partner: state.partner, partnerCode: state.partnerCode,
                 time: now(), shift: getShift(), cashier: state.currentUser, branch: 'زانکۆ',
                 timestamp: Date.now(), image: state.cart[0]?.image || '',
-                tableNumber: isDineTable ? state.activeTable : null,
-                status: 'completed',
-                itemStatuses: {}
+                tableNumber: isDineTable ? state.activeTable : null
             };
-            orderData.items.forEach(it => { orderData.itemStatuses[it.id] = 'ready'; });
 
-            // ✅ زیادکردن بۆ state
-            state.orders.push(orderData);
+            const order = { uniqueId, ...orderData, status: 'completed', itemStatuses: {} };
+            order.items.forEach(it => { order.itemStatuses[it.id] = 'ready'; });
 
-            // ✅ سەیڤکردنی شەریکە (ئەگەر هەبوو)
+            state.orders.push(order);
             if (state.orderType === 'partner' && state.partner) {
-                await savePartnerOrderToFirestore(orderData);
+                savePartnerOrderToFirestore(orderData);
             }
 
-            // ✅ سەیڤکردنی ئۆردەر بۆ دۆکیومێنتی سەرەکی — بە await
-            await saveOrdersToFirestore();
+            const receiptOrder = { ...order };
 
-            // ✅ پرێنت
-            const receiptOrder = { ...orderData };
-            if (state.orderType === 'dine' || state.orderType === 'takeaway' || isDineTable) {
-                printReceipt(receiptOrder);
-            }
-
-            // ✅ پاککردنەوە
             if (isDineTable) {
                 delete state.tableOrders[state.activeTable];
                 state.activeTable = null;
             }
+
             state.cart = [];
             state.partnerCode = '';
             state.discount = 0; state.discountAmount = 0;
             toast('✅ ئۆردەر سەیڤ کرا!');
+
+            if (state.orderType === 'dine' || state.orderType === 'takeaway' || isDineTable) {
+                printReceipt(receiptOrder);
+            }
+
+            saveOrdersToFirestore();
             render();
         };
     });
@@ -914,7 +878,7 @@ async function init() {
     state.isLoading = true;
     render();
     try {
-        try { await signInAnonymously(auth); } catch (e) { console.warn('⚠️ ئەنۆنیمەس نەتوانرا:', e.message); }
+        try { await signInAnonymously(auth); } catch (e) {}
         loadItemsFromFirestore();
         loadOrdersFromFirestore();
         loadPartnerOrdersFromFirestore();
